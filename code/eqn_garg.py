@@ -3,7 +3,7 @@ from brian2 import *
 n_input = 784
 n_e = 400
 n_i = n_e 
-time_per_img = 350 * ms
+time_per_img = 500 * ms
 target_weight = 78.0    
 max_delay = 10 * ms
 
@@ -12,12 +12,13 @@ lr = 0.05
 refrac_in = 5 * ms
 tau_in = 30 * ms
 #input layer
-v_reset_in = -1.0 * volt
-v_rest_in = 0 * volt
-v_thresh_in = 1.0 * volt
-input_bias = 0.5 * volt
+V_reset = -1.0 * volt
+V_rest = 0 * volt
+V_thresh = 1.0 * volt
+bias = 0.5 * volt
 
 # diehl and cook neuron parameters
+# E is for excitory and I for inhibitory
 E_rest = -65. * mV
 I_rest = -60. * mV 
 E_reset = -65. * mV
@@ -45,40 +46,56 @@ tau_gi = 2 * ms
 tau_theta = 1e7 * ms
 
 
-# input layer 
+# input layer
+
+# eqs_in = '''
+# 	dv/dt = ((V_rest - v) + I + bias) / tau_in : volt (unless refractory)
+# 	I : volt  
+# 	'''
+
 eqs_in = '''
-dv/dt = ((v_rest_in - v) + I + bias) / tau_in : volt (unless refractory)
-I : volt  
-'''
+	dv/dt = ((V_rest - v) + I + bias) / tau_in : volt (unless refractory)
+	I = pixel_input(t - t_offset, i) * volt : volt
+	'''
 
 # excitatory neurons
 eqs_e = '''
-dv/dt = ((E_rest - v) + ge*(E_exc - v) + gi*(E_inh - v)) / tau_e : volt (unless refractory)
-dge/dt = -ge / tau_ge : 1
-dgi/dt = -gi / tau_gi : 1
-dtheta/dt = -theta / tau_theta : volt
-v_thresh = E_thresh + theta - theta_offset: volt
-'''
+	dv/dt = ((E_rest - v) + ge*(E_exc - v) + gi*(E_inh - v)) / tau_e : volt (unless refractory)
+	dge/dt = -ge / tau_ge : 1
+	dgi/dt = -gi / tau_gi : 1
+	dtheta/dt = -theta / tau_theta : volt
+	adaptive_thresh = E_thresh + theta - theta_offset: volt
+	'''
+
+# Disable homeostasis during the inference
+eqs_e_test = '''
+	dv/dt = ((E_rest - v) + ge*(E_exc - v) + gi*(E_inh - v)) / tau_e : volt (unless refractory)
+	dge/dt = -ge / tau_ge : 1
+	dgi/dt = -gi / tau_gi : 1
+	theta : volt
+	adaptive_thresh = E_thresh + theta - theta_offset: volt
+	'''
 
 # inhibitory neurons
 eqs_i = '''
-dv/dt = ((I_rest - v) + ge*(E_exc - v) + gi*(E_inh - v)) / tau_i : volt (unless refractory)
-dge/dt = -ge / tau_ge : 1
-dgi/dt = -gi / tau_gi : 1
-'''
+	dv/dt = ((I_rest - v) + ge*(E_exc - v) + gi*(E_inh - v)) / tau_i : volt (unless refractory)
+	dge/dt = -ge / tau_ge : 1
+	dgi/dt = -gi / tau_gi : 1
+	'''
 
 # VDSP synapse equations
 
 eqs_vdsp = '''
-w : 1
-'''
+	w : 1
+	'''
 
 eqs_vdsp_pre = '''
-ge_post += w
-'''
+	ge_post += w
+	'''
+
 eqs_vdsp_post = '''
-v_norm = v_pre / volt
-dw_pot = (wmax - w) * (exp(-v_norm) - 1.0) * lr * int(v_norm < 0)
-dw_dep = -w * (exp(v_norm) - 1.0) * lr * int(v_norm >= 0)
-w = clip(w + dw_pot + dw_dep, 0.0, wmax)
-'''
+	v_norm = v_pre / volt
+	dw_pot = (wmax - w) * (exp(-v_norm) - 1.0) * lr * int(v_norm < 0)
+	dw_dep = -w * (exp(v_norm) - 1.0) * lr * int(v_norm >= 0)
+	w = clip(w + dw_pot + dw_dep, 0.0, wmax)
+	'''
