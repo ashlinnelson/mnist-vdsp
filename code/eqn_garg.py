@@ -3,7 +3,7 @@ from brian2 import *
 n_input = 784
 n_e = 400
 n_i = n_e 
-time_per_img = 500 * ms
+time_per_img = 400 * ms
 target_weight = 78.0    
 max_delay = 10 * ms
 
@@ -48,14 +48,9 @@ tau_theta = 1e7 * ms
 
 # input layer
 
-# eqs_in = '''
-# 	dv/dt = ((V_rest - v) + I + bias) / tau_in : volt (unless refractory)
-# 	I : volt  
-# 	'''
-
 eqs_in = '''
 	dv/dt = ((V_rest - v) + I + bias) / tau_in : volt (unless refractory)
-	I = pixel_input(t - t_offset, i) * volt : volt
+	I : volt  
 	'''
 
 # excitatory neurons
