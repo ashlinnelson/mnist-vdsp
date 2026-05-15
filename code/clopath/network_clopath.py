@@ -7,11 +7,11 @@ def build_network_train():
     inp_group = PoissonGroup(n_input, rates='input_rates(t - batch_start_time, i)', name='inp')
 
     # Excitatory Layer
-    exc_group = NeuronGroup(n_e, eqs_e, threshold='u > (VT + theta_hom)', 
+    exc_group = NeuronGroup(n_e, eqs_e, threshold='u > -20*mV', 
                             reset=reset_exc, method='euler', name='exc')
     exc_group.u = EL
-    exc_group.dubar_minus = EL
-    exc_group.dubar_plus = EL
+    exc_group.ubar_minus = EL
+    exc_group.ubar_plus = EL
     
     # Inhibitory Layer
     inh_group = NeuronGroup(n_i, eqs_i, threshold='v > I_thresh', 
@@ -20,19 +20,25 @@ def build_network_train():
     inh_group.v = I_rest
     
     # Input -> Excitatory (VDSP Plasticity)
-    S_inp_exc = Synapses(inp_group, exc_group, model=eqs_clopath,
-                         on_pre=on_pre_clopath, name='s_inp_exc')
+    S_inp_exc = Synapses(inp_group, exc_group, model=eqs_clopath,on_pre=on_pre_clopath, method='euler', name='s_inp_exc')
 	
     S_inp_exc.connect(p=1.0)
     S_inp_exc.w = 'rand() * wmax'
     S_inp_exc.delay = 'rand() * max_delay'
+
+	# normalize weight at t=0
+    w_array = np.array(S_inp_exc.w)
+    col_sums = np.bincount(S_inp_exc.j, weights=w_array, minlength=n_e)
+    col_sums[col_sums == 0] = 1.0 
+    scale_factors = target_weight / col_sums
+    S_inp_exc.w = w_array * scale_factors[S_inp_exc.j]
 
     # Excitatory -> Inhibitory (1-to-1)
     S_exc_inh = Synapses(exc_group, inh_group, on_pre='ge_post += w_ei', name='s_exc_inh')
     S_exc_inh.connect(j='i')
 
     # Inhibitory -> Excitatory (Winner-Take-All lateral inhibition)
-    S_inh_exc = Synapses(inh_group, exc_group, on_pre='I_syn_post -= w_ie * 100 * pA', name='s_inh_exc')
+    S_inh_exc = Synapses(inh_group, exc_group, on_pre='g_inh_post += w_ie * 10 * nS', name='s_inh_exc')
     S_inh_exc.connect(condition='i != j')
 
     # Monitors
@@ -58,11 +64,11 @@ def build_network_test():
     inp_group = PoissonGroup(n_input, rates='input_rates(t - batch_start_time, i)', name='inp')
 
     # Excitatory Layer
-    exc_group = NeuronGroup(n_e, eqs_e_test, threshold='u > (VT + theta_hom)', 
+    exc_group = NeuronGroup(n_e, eqs_e_test, threshold='u > -20*mV', 
                             reset=reset_exc, method='euler', name='exc')
     exc_group.u = EL
-    exc_group.dubar_minus = EL
-    exc_group.dubar_plus = EL
+    exc_group.ubar_minus = EL
+    exc_group.ubar_plus = EL
     
     # Inhibitory Layer
     inh_group = NeuronGroup(n_i, eqs_i, threshold='v > I_thresh', 
@@ -82,7 +88,7 @@ def build_network_test():
     S_exc_inh.connect(j='i')
 
     # Inhibitory -> Excitatory (Winner-Take-All lateral inhibition)
-    S_inh_exc = Synapses(inh_group, exc_group, on_pre='I_syn_post -= w_ie * 100 * pA', name='s_inh_exc')
+    S_inh_exc = Synapses(inh_group, exc_group, on_pre='g_inh_post += w_ie * 10 * nS', name='s_inh_exc')
     S_inh_exc.connect(condition='i != j')
 
     # Monitors
