@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from brian2 import *
 
 def get_2d_weights(synapse_group, n_input, n_e):
     """extracts weights into a 2D matrix"""

@@ -102,3 +102,55 @@ def build_network_train(N_outputs=10, lr=0.01):
 				  WTA_Synapses, spike_mon, enforce_wta)
 
 	return net, InputLayer, FeedForward, OutputLayer, spike_mon
+
+def build_network_test(N_outputs=10, lr=0.01):
+		
+	input_eqs_test = '''
+	dv/dt = (-v + I_pixel + bias_in) / tau_m : 1 (unless refractory)
+	I_pixel : 1
+	'''
+	InputLayer = NeuronGroup(N_inputs, input_eqs_test, threshold='v > v_th', 
+	                         reset='v = v_reset_in', refractory=t_ref, method='exact')
+	
+	OutputLayer = NeuronGroup(N_outputs, output_eqs,
+							  threshold='v > v_th and t >= clamp_release_time', 
+	                          reset='v = v_reset_out; n += inc_n', 
+	                          refractory=t_ref, method='euler')
+	
+	InputLayer.v = 'v_reset_in + rand() * (v_th - v_reset_in)'
+	OutputLayer.v = 'v_rest_out + rand() * v_th'
+	OutputLayer.n = 0.0 #will be overwitten
+	OutputLayer.clamp_release_time = 0*ms 
+	
+	
+	FeedForward = Synapses(InputLayer, OutputLayer, model=vdsp_model,
+                               on_pre=on_pre_forward, name="feed_forward")
+	FeedForward.connect() 
+	FeedForward.w = 0.0 #will be overwritten
+	
+	WTA_Synapses = Synapses(OutputLayer, OutputLayer, on_pre=wta_pre)
+	WTA_Synapses.connect(condition='i != j') 
+	
+	# Monitors
+	spike_mon = SpikeMonitor(OutputLayer)
+
+	@network_operation(dt=defaultclock.dt, when='thresholds', order=-1)
+	def enforce_wta(t):
+		v       = OutputLayer.v[:]
+		t_now   = t / second  
+		clamped = OutputLayer.clamp_release_time[:] / second > t_now 
+		eligible = (v > v_th) & ~clamped
+	
+		if np.sum(eligible) > 1:
+			eligible_v     = np.where(eligible, v, -np.inf)
+			winner         = int(np.argmax(eligible_v))
+			losers         = eligible.copy()
+			losers[winner] = False
+			for j in np.where(losers)[0]:
+				OutputLayer.v[j] = 0.0
+	
+	# Assemble Network
+	net = Network(InputLayer, OutputLayer, FeedForward,
+				  WTA_Synapses, spike_mon, enforce_wta)
+
+	return net, InputLayer, FeedForward, OutputLayer, spike_mon
