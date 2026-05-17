@@ -46,3 +46,22 @@ def plot_confusion_matrix(cm):
 
     plt.tight_layout()
     plt.show()
+
+def show_spikes(spike_mon, a=0, b=2000):
+	plt.figure(figsize=(14, 5))
+	plt.plot(spike_mon.t / ms, spike_mon.i, '.k', markersize=2)
+	plt.xlabel('Time (ms)')
+	plt.ylabel('Neuron Index')
+	plt.title('Excitatory Layer Raster Plot (Who fired and when?)')
+	# Limit the view to the first few images
+	plt.xlim(a, b) 
+	plt.show()
+	
+	# Total Spikes per Neuron
+	plt.figure(figsize=(14, 4))
+	spike_counts = np.array(spike_mon.count)
+	plt.bar(range(len(spike_counts)), spike_counts, color='royalblue')
+	plt.xlabel('Neuron Index')
+	plt.ylabel('Total Spikes')
+	plt.title('Total Spikes per Neuron (Is Winner-Take-All working?)')
+	plt.show()
